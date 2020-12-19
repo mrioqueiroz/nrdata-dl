@@ -6,5 +6,7 @@ edition = "2018"
 
 [dependencies]
 dotenv = "0.15.0"
+filetime = "0.2.13"
 lazy_static = "1.4.0"
 regex = "1.4.2"
+walkdir = "2.3.1"
