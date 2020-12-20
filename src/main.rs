@@ -9,7 +9,8 @@
 //!
 //! - Correctly handle the requests with the API key;
 //! - Generate the CSV summary from the downloaded data;
-//! - Validate the FR.
+//! - Validate the FR;
+//! - Separate results for multiple customers.
 
 #[macro_use]
 extern crate lazy_static;
@@ -61,13 +62,33 @@ lazy_static! {
 
 /// Create output folder in the current directory if not exists.
 /// Do nothing otherwise.
-fn create_output_folder() {
-    if std::fs::create_dir(OUTPUT_FOLDER.as_str()).is_ok() {}
+fn create_output_folder(folder_name: &str) {
+    if std::fs::create_dir(folder_name).is_ok() {}
+}
+
+#[test]
+fn output_folder_creation_and_deletion() {
+    let folder_name = "test/";
+    create_output_folder(&folder_name);
+    assert_eq!(std::path::Path::exists((&folder_name).as_ref()), true);
+    std::fs::remove_dir(&folder_name).unwrap();
+    assert_eq!(std::path::Path::exists((&folder_name).as_ref()), false);
 }
 
 /// Read RFs from file line by line.
-fn get_frs_from_file() -> Lines<BufReader<File>> {
-    BufReader::new(File::open(INPUT_FILE.as_str()).unwrap()).lines()
+fn get_frs_from_file(file_name: &str) -> Lines<BufReader<File>> {
+    BufReader::new(File::open(file_name).unwrap()).lines()
+}
+
+#[test]
+fn frs_from_file() {
+    use std::io::Write;
+    let file_name = "test_frs";
+    let mut file = File::create(file_name).unwrap();
+    file.write_all(b"00000").unwrap();
+    let content = get_frs_from_file(&file_name).nth(0).unwrap().unwrap();
+    assert_eq!(content, "00000");
+    std::fs::remove_file(&file_name).unwrap();
 }
 
 /// Remove all non-numeric characters from the FR so it can be used to make the
@@ -80,7 +101,7 @@ fn normalize_fr(fr: &str) -> String {
 }
 
 #[test]
-fn normalized() {
+fn normalized_frs() {
     assert_eq!(normalize_fr(""), "");
     assert_eq!(normalize_fr("12"), "12");
     assert_eq!(normalize_fr("no numbers"), "");
@@ -98,6 +119,16 @@ fn is_downloaded(fr: &str) -> bool {
     false
 }
 
+#[test]
+fn downloads() {
+    let file_name = "test_download";
+    let file_path = format!("{}{}", *OUTPUT_FOLDER, file_name);
+    File::create(&file_path).unwrap();
+    assert_eq!(is_downloaded(&file_name), true);
+    std::fs::remove_file(&file_path).unwrap();
+    assert_eq!(is_downloaded(&file_name), false);
+}
+
 /// Check if the downloaded file is older than the specified `MAXIMUM_AGE`.
 /// If so, it needs to be downloaded again.
 fn is_old(age_of_file: i64) -> bool {
@@ -105,7 +136,7 @@ fn is_old(age_of_file: i64) -> bool {
 }
 
 #[test]
-fn test_age() {
+fn test_is_old() {
     if *MAXIMUM_AGE == 30 {
         assert_eq!(is_old(1), false);
         assert_eq!(is_old(30), false);
@@ -125,6 +156,15 @@ fn get_age_of_file(file_name: &str) -> i64 {
     )
 }
 
+#[test]
+fn age_of_new_file() {
+    let file_name = "test_age";
+    let file_path = format!("{}{}", *OUTPUT_FOLDER, file_name);
+    File::create(&file_path).unwrap();
+    assert_eq!(get_age_of_file(&file_path), 0);
+    std::fs::remove_file(&file_path).unwrap();
+}
+
 /// Helper function to convert the timestamp as day.
 fn age_in_days(seconds: i64) -> i64 {
     let age_in_minutes = seconds / 60;
@@ -133,7 +173,7 @@ fn age_in_days(seconds: i64) -> i64 {
 }
 
 #[test]
-fn day() {
+fn test_age_in_days() {
     let sec_day = 86400;
     assert_eq!(age_in_days(sec_day - 100), 0);
     assert_eq!(age_in_days(sec_day), 1);
@@ -144,8 +184,8 @@ fn day() {
 
 #[doc(hidden)]
 fn main() {
-    create_output_folder();
-    for fr in get_frs_from_file() {
+    create_output_folder(OUTPUT_FOLDER.as_str());
+    for fr in get_frs_from_file(INPUT_FILE.as_str()) {
         let normalized_fr = normalize_fr(&fr.unwrap());
         let api_call = format!("{}{}", API_URL.to_string(), normalized_fr);
         let file_path = format!("{}{}.json", OUTPUT_FOLDER.to_string(), normalized_fr);
