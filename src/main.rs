@@ -1,6 +1,6 @@
-//! # FR Data Downloader
+//! # NR Data Downloader
 //!
-//! Utility to download FR Data from public API.
+//! Utility to download NR Data from public API.
 //!
 //! The motivation to crate this tool was the need to conduct routine audits
 //! on customer databases to ensure that all government requirements were met.
@@ -9,7 +9,7 @@
 //!
 //! - Correctly handle the requests with the API key;
 //! - Generate the CSV summary from the downloaded data;
-//! - Validate the FR;
+//! - Validate the NR;
 //! - Separate results for multiple customers.
 
 #[macro_use]
@@ -42,7 +42,7 @@ lazy_static! {
     static ref INTERVAL: f32 =
         60.0 / LIMIT_PER_MINUTE.parse::<f32>().unwrap() + MARGIN_OF_ERROR.parse::<f32>().unwrap();
 
-    /// File containing the FR, separated by new line.
+    /// File containing the NR, separated by new line.
     static ref INPUT_FILE: String =
         dotenv::var("INPUT_FILE").unwrap_or_else(|_| "./input.txt".to_string());
 
@@ -52,9 +52,9 @@ lazy_static! {
 
     /// Maximum age of file to determine if it needs to be downloaded again.
     ///
-    /// 30 days seems to be a good interval, since the FR data doesn't change
+    /// 30 days seems to be a good interval, since the NR data doesn't change
     /// so frequently, and this way we do not need to make so many requests to
-    /// the server, since different customers may have associations with FRs
+    /// the server, since different customers may have associations with NRs
     /// from others.
     static ref MAXIMUM_AGE: i64 =
         dotenv::var("MAXIMUM_AGE").unwrap_or_else(|_| "30".to_string()).parse::<i64>().unwrap();
@@ -76,43 +76,43 @@ fn output_folder_creation_and_deletion() {
 }
 
 /// Read RFs from file line by line.
-fn get_frs_from_file(file_name: &str) -> Lines<BufReader<File>> {
+fn get_nrs_from_file(file_name: &str) -> Lines<BufReader<File>> {
     BufReader::new(File::open(file_name).unwrap()).lines()
 }
 
 #[test]
 fn frs_from_file() {
     use std::io::Write;
-    let file_name = "test_frs";
+    let file_name = "test_nrs";
     let mut file = File::create(file_name).unwrap();
     file.write_all(b"00000").unwrap();
-    let content = get_frs_from_file(&file_name).nth(0).unwrap().unwrap();
+    let content = get_nrs_from_file(&file_name).nth(0).unwrap().unwrap();
     assert_eq!(content, "00000");
     std::fs::remove_file(&file_name).unwrap();
 }
 
-/// Remove all non-numeric characters from the FR so it can be used to make the
+/// Remove all non-numeric characters from the NR so it can be used to make the
 /// HTTP request to the API.
-fn normalize_fr(fr: &str) -> String {
+fn normalize_nr(nr: &str) -> String {
     Regex::new(r"[^0-9]")
         .unwrap()
-        .replace_all(&fr, "")
+        .replace_all(&nr, "")
         .to_string()
 }
 
 #[test]
-fn normalized_frs() {
-    assert_eq!(normalize_fr(""), "");
-    assert_eq!(normalize_fr("12"), "12");
-    assert_eq!(normalize_fr("no numbers"), "");
-    assert_eq!(normalize_fr(" as-12.df "), "12");
+fn normalized_nrs() {
+    assert_eq!(normalize_nr(""), "");
+    assert_eq!(normalize_nr("12"), "12");
+    assert_eq!(normalize_nr("no numbers"), "");
+    assert_eq!(normalize_nr(" as-12.df "), "12");
 }
 
-/// Check if the specified FR already has the respective file in the `OUTPUT_FOLDER`.
-fn is_downloaded(fr: &str) -> bool {
+/// Check if the specified NR already has the respective file in the `OUTPUT_FOLDER`.
+fn is_downloaded(nr: &str) -> bool {
     for entry in WalkDir::new(OUTPUT_FOLDER.to_string()) {
         let path = entry.unwrap().path().to_str().unwrap().to_owned();
-        if path.contains(fr) {
+        if path.contains(nr) {
             return true;
         }
     }
@@ -182,15 +182,20 @@ fn test_age_in_days() {
     assert_eq!(age_in_days(sec_day * 2 + 100), 2);
 }
 
+fn make_request(url: &str) {
+    let body = reqwest::blocking::get(url)?.text()?;
+    println!("body = {:?}", body);
+}
+
 #[doc(hidden)]
 fn main() {
     create_output_folder(OUTPUT_FOLDER.as_str());
-    for fr in get_frs_from_file(INPUT_FILE.as_str()) {
-        let normalized_fr = normalize_fr(&fr.unwrap());
-        let api_call = format!("{}{}", API_URL.to_string(), normalized_fr);
-        let file_path = format!("{}{}.json", OUTPUT_FOLDER.to_string(), normalized_fr);
-
-        println!("{:?}", is_downloaded(&normalized_fr));
+    for nr in get_nrs_from_file(INPUT_FILE.as_str()) {
+        let normalized_nr = normalize_nr(&nr.unwrap());
+        let api_call = format!("{}{}", API_URL.to_string(), normalized_nr);
+        let file_path = format!("{}{}.json", OUTPUT_FOLDER.to_string(), normalized_nr);
+        make_request(&api_call);
+        println!("{:?}", is_downloaded(&normalized_nr));
         println!("{:?}", is_old(get_age_of_file(&file_path)));
     }
 }
