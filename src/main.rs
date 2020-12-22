@@ -8,15 +8,19 @@
 //! Among the things that still need to be done are:
 //!
 //! - Correctly handle the requests with the API key;
+//! - Correctly handle errors (remove `.unwrap()`);
 //! - Generate the CSV summary from the downloaded data;
 //! - Validate the NR;
 //! - Separate results for multiple customers.
+//!   - This can be done by creating a .zip file containing only the downloaded
+//!     files that are in the current input list.
 
 #[macro_use]
 extern crate lazy_static;
 
 use std::fs::{metadata, File};
-use std::io::{BufRead, BufReader, Lines};
+use std::io::{BufRead, BufReader, Lines, Write};
+use std::{thread, time};
 
 use filetime::FileTime;
 use regex::Regex;
@@ -75,14 +79,13 @@ fn output_folder_creation_and_deletion() {
     assert_eq!(std::path::Path::exists((&folder_name).as_ref()), false);
 }
 
-/// Read RFs from file line by line.
+/// Read NRs from file line by line.
 fn get_nrs_from_file(file_name: &str) -> Lines<BufReader<File>> {
     BufReader::new(File::open(file_name).unwrap()).lines()
 }
 
 #[test]
 fn frs_from_file() {
-    use std::io::Write;
     let file_name = "test_nrs";
     let mut file = File::create(file_name).unwrap();
     file.write_all(b"00000").unwrap();
@@ -92,7 +95,8 @@ fn frs_from_file() {
 }
 
 /// Remove all non-numeric characters from the NR so it can be used to make the
-/// HTTP request to the API.
+/// HTTP request to the API no matter the format the user specify in the
+/// input file.
 fn normalize_nr(nr: &str) -> String {
     Regex::new(r"[^0-9]")
         .unwrap()
@@ -182,9 +186,27 @@ fn test_age_in_days() {
     assert_eq!(age_in_days(sec_day * 2 + 100), 2);
 }
 
-fn make_request(url: &str) {
-    let body = reqwest::blocking::get(url)?.text()?;
-    println!("body = {:?}", body);
+fn make_request(url: &str) -> String {
+    for _ in &[..3] {
+        let response = reqwest::blocking::get(url);
+        println!("Waiting response from API...");
+        if let Err(e) = response {
+            if e.is_timeout() {
+                println!("Timed out. Retrying...");
+                thread::sleep(time::Duration::from_secs(2));
+                // How to measure the actual time needed between each new
+                // request if a timeout occurs?
+                continue;
+            }
+        } else if let Ok(r) = response {
+            if r.status().as_str() == "200" {
+                println!("Data received.");
+                return r.text().unwrap();
+            }
+        }
+    }
+    println!("Got nothing...");
+    String::from("")
 }
 
 #[doc(hidden)]
@@ -194,8 +216,19 @@ fn main() {
         let normalized_nr = normalize_nr(&nr.unwrap());
         let api_call = format!("{}{}", API_URL.to_string(), normalized_nr);
         let file_path = format!("{}{}.json", OUTPUT_FOLDER.to_string(), normalized_nr);
-        make_request(&api_call);
-        println!("{:?}", is_downloaded(&normalized_nr));
-        println!("{:?}", is_old(get_age_of_file(&file_path)));
+        // TODO: Check if file contains valid data.
+        if !is_downloaded(&normalized_nr)
+            | (is_downloaded(&normalized_nr) && is_old(get_age_of_file(&file_path)))
+        {
+            println!("Requesting {} data...", normalized_nr);
+            let nr_data = make_request(&api_call);
+            if nr_data != "".to_string() {
+                let mut nr_file = File::create(&file_path).unwrap();
+                nr_file.write_all(&nr_data.as_bytes()).unwrap();
+            }
+        } else {
+            println!("Skipping {}. Already saved...", normalized_nr);
+        }
     }
+    println!("Done.")
 }
