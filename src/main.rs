@@ -3,7 +3,8 @@
 //! Utility to download NR Data from public API.
 //!
 //! The motivation to crate this tool was the need to conduct routine audits
-//! on customer databases to ensure that all government requirements were met.
+//! on customer databases to ensure that all government requirements were met
+//! before the respective deadlines.
 //!
 //! Among the things that still need to be done are:
 //!
@@ -11,8 +12,10 @@
 //! - Correctly handle errors (remove `.unwrap()`);
 //! - Generate the CSV summary from the downloaded data;
 //! - Validate the NR;
+//! - Generate logs;
+//! - Get data from command-line arguments (having priority over the .env file);
 //! - Separate results for multiple customers.
-//!   - This can be done by creating a .zip file containing only the downloaded
+//!   - This can be done by creating a `.zip` file containing only the downloaded
 //!     files that are in the current input list.
 
 #[macro_use]
@@ -26,14 +29,15 @@ use filetime::FileTime;
 use regex::Regex;
 use walkdir::WalkDir;
 
-// Added this macro to be able to have `static`s with data loaded from `dotenv` at runtime.
-// Trying to use `const` in this case produces the following error:
-// `calls in constants are limited to constant functions, tuple structs and tuple variants`
+// Added this macro to be able to have `static`s with data loaded from `dotenv`
+// at runtime. Trying to use `const` in this case produces the following error:
+// `calls in constants are limited to constant functions, tuple structs and
+// tuple variants`
 lazy_static! {
     /// URL to get data from.
     static ref API_URL: String = dotenv::var("API_URL").expect("Unable to get API URL.");
 
-    /// Margin of error in seconds to get the data, respecting the limits of the API.
+    /// Margin of error (in seconds) to get the data, respecting the limits of the API.
     static ref MARGIN_OF_ERROR: String =
         dotenv::var("MARGIN_OF_ERROR").unwrap_or_else(|_| "0".to_string());
 
@@ -41,16 +45,20 @@ lazy_static! {
     static ref LIMIT_PER_MINUTE: String =
         dotenv::var("LIMIT_PER_MINUTE").unwrap_or_else(|_| "3".to_string());
 
-    /// Interval, in seconds, between each HTTP request according to the values specified
+    /// Interval (in seconds) between each HTTP request, based on the values specified
     /// in `LIMIT_PER_MINUTE` and `MARGIN_OF_ERROR`.
     static ref INTERVAL: f32 =
         60.0 / LIMIT_PER_MINUTE.parse::<f32>().unwrap() + MARGIN_OF_ERROR.parse::<f32>().unwrap();
 
-    /// File containing the NR, separated by new line.
+    /// File containing the NRs. The NRs must be separated by new line.
     static ref INPUT_FILE: String =
         dotenv::var("INPUT_FILE").unwrap_or_else(|_| "./input.txt".to_string());
 
     /// Path of the folder to save the data obtained from the API.
+    ///
+    /// If the folder already contains data related to any of the NRs from
+    /// the input file, and they are not older than the specified days, the
+    /// data will not be downladed again.
     static ref OUTPUT_FOLDER: String =
         dotenv::var("OUTPUT_FOLDER").unwrap_or_else(|_| "./downloads/".to_string());
 
@@ -79,7 +87,7 @@ fn output_folder_creation_and_deletion() {
     assert_eq!(std::path::Path::exists((&folder_name).as_ref()), false);
 }
 
-/// Read NRs from file line by line.
+/// Return the NRs from the input file.
 fn get_nrs_from_file(file_name: &str) -> Lines<BufReader<File>> {
     BufReader::new(File::open(file_name).unwrap()).lines()
 }
@@ -186,10 +194,15 @@ fn test_age_in_days() {
     assert_eq!(age_in_days(sec_day * 2 + 100), 2);
 }
 
+/// Make the actual request to the API.
+///
+/// Since the API limits the number of requests per minute, there is no need
+/// to use `async` at this time.
 fn make_request(url: &str) -> String {
     for _ in &[..3] {
+        println!("Waiting for response from API...");
+        let start_time = std::time::Instant::now();
         let response = reqwest::blocking::get(url);
-        println!("Waiting response from API...");
         if let Err(e) = response {
             if e.is_timeout() {
                 println!("Timed out. Retrying...");
@@ -201,6 +214,12 @@ fn make_request(url: &str) -> String {
         } else if let Ok(r) = response {
             if r.status().as_str() == "200" {
                 println!("Data received.");
+                let duration = std::time::Instant::now() - start_time;
+                if duration.as_secs_f32() < *INTERVAL {
+                    let interval = *INTERVAL - duration.as_secs_f32();
+                    println!("Waiting {} seconds before next action...", interval);
+                    thread::sleep(time::Duration::from_secs(interval as u64));
+                }
                 return r.text().unwrap();
             }
         }
@@ -222,7 +241,7 @@ fn main() {
         {
             println!("Requesting {} data...", normalized_nr);
             let nr_data = make_request(&api_call);
-            if nr_data != "".to_string() {
+            if nr_data != *"" {
                 let mut nr_file = File::create(&file_path).unwrap();
                 nr_file.write_all(&nr_data.as_bytes()).unwrap();
             }
@@ -230,5 +249,5 @@ fn main() {
             println!("Skipping {}. Already saved...", normalized_nr);
         }
     }
-    println!("Done.")
+    println!("All done.")
 }
