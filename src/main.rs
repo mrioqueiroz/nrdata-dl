@@ -207,16 +207,14 @@ fn make_request(url: &str) -> String {
             if e.is_timeout() {
                 println!("Timed out. Retrying...");
                 thread::sleep(time::Duration::from_secs(2));
-                // How to measure the actual time needed between each new
-                // request if a timeout occurs?
                 continue;
             }
         } else if let Ok(r) = response {
             if r.status().as_str() == "200" {
                 println!("Data received.");
-                let duration = std::time::Instant::now() - start_time;
-                if duration.as_secs_f32() < *INTERVAL {
-                    let interval = *INTERVAL - duration.as_secs_f32();
+                let duration = start_time.elapsed().as_secs_f32();
+                if duration < *INTERVAL {
+                    let interval = *INTERVAL - duration;
                     println!("Waiting {} seconds before next action...", interval);
                     thread::sleep(time::Duration::from_secs(interval as u64));
                 }
