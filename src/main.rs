@@ -9,6 +9,7 @@
 //! Among the things that still need to be done are:
 //!
 //! - Correctly handle the requests with the API key;
+//! - Reorder functions by usage to improve readability;
 //! - Correctly handle errors (remove `.unwrap()`);
 //! - Generate the CSV summary from the downloaded data;
 //! - Validate the NR;
@@ -93,7 +94,7 @@ fn get_nrs_from_file(file_name: &str) -> Lines<BufReader<File>> {
 }
 
 #[test]
-fn frs_from_file() {
+fn nrs_from_file() {
     let file_name = "test_nrs";
     let mut file = File::create(file_name).unwrap();
     file.write_all(b"00000").unwrap();
