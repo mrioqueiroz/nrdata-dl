@@ -22,7 +22,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::fs::{create_dir_all, metadata, File};
+use std::fs::{metadata, File};
 use std::io::{BufRead, BufReader, Lines, Write};
 use std::{thread, time};
 
@@ -136,7 +136,7 @@ fn is_downloaded(nr: &str) -> bool {
 fn downloads() {
     let file_name = "test_download";
     let file_path = format!("{}{}", *OUTPUT_FOLDER, file_name);
-    create_dir_all(OUTPUT_FOLDER.to_string()).unwrap();
+    std::fs::create_dir_all(OUTPUT_FOLDER.to_string()).unwrap();
     File::create(&file_path).unwrap();
     assert_eq!(is_downloaded(&file_name), true);
     std::fs::remove_file(&file_path).unwrap();
@@ -174,7 +174,7 @@ fn get_age_of_file(file_name: &str) -> i64 {
 fn age_of_new_file() {
     let file_name = "test_age";
     let file_path = format!("{}{}", *OUTPUT_FOLDER, file_name);
-    create_dir_all(OUTPUT_FOLDER.to_string()).unwrap();
+    std::fs::create_dir_all(OUTPUT_FOLDER.to_string()).unwrap();
     File::create(&file_path).unwrap();
     assert_eq!(get_age_of_file(&file_path), 0);
     std::fs::remove_file(&file_path).unwrap();
