@@ -8,6 +8,8 @@ description = "Utility to download NR Data from public API"
 readme = "README.md"
 categories = ["command-line-utilities"]
 publish = false
+license = "Apache-2.0"
+license-file = "LICENSE"
 
 [dependencies]
 dotenv = "0.15.0"
