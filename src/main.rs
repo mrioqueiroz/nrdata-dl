@@ -1,22 +1,22 @@
 //! # NR Data Downloader
 //!
 //! Utility to download NR Data from public API.
-//! 
-//! *This is still a work in progress, so not all the functionalities are 
+//!
+//! *This is still a work in progress, so not all the functionalities are
 //! available.*
-//! 
-//! To know more, please take a look at the comments in 
+//!
+//! To know more, please take a look at the comments in
 //! [`src/main.rs`](src/main.rs).
 //!
 //! ### Motivation
-//! 
+//!
 //! The motivation to create this tool was the need to conduct routine audits
 //! on customer databases to ensure that all government requirements were met
 //! before the respective deadlines.
 //!
 //! ### Building
 //!
-//! If using NixOS, just run `nix-shell --pure` to build the development 
+//! If using NixOS, just run `nix-shell --pure` to build the development
 //! environment. On Ubuntu, remember to install `libssl-dev`.
 //!
 //! ### Roadmap
