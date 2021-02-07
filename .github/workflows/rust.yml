@@ -104,9 +104,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v1
 
-      - name: Lint .env
+      - name: Lint dotenv
         uses: dotenv-linter/action-dotenv-linter@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: Actions
+          reporter: github-pr-review
           dotenv_linter_flags: --skip UnorderedKey
