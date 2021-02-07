@@ -3,6 +3,11 @@ name = "nrdata-dl"
 version = "0.1.0"
 authors = ["Mário Queiroz <mario.al.queiroz@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/mrioqueiroz/nrdata-dl/"
+description = "Utility to download NR Data from public API"
+readme = "README.md"
+categories = ["command-line-utilities"]
+publish = false
 
 [dependencies]
 dotenv = "0.15.0"
