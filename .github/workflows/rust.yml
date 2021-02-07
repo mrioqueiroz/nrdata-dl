@@ -68,13 +68,13 @@ jobs:
         command: clippy
 
     - name: Check outdated dependencies
+      continue-on-error: true
       run: cargo install cargo-outdated && cargo outdated -R
 
     - name: Look for security vulnerabilities
+      continue-on-error: true
       run: cargo install cargo-audit && cargo audit
 
     - name: Check license compatibility
+      continue-on-error: true
       run: cargo install cargo-lichking && cargo lichking check
-
-    - name: Cache
-      uses: Swatinem/rust-cache@v1
