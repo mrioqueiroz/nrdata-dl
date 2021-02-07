@@ -75,3 +75,38 @@ jobs:
 
     - name: Check license compatibility
       run: cargo install cargo-lichking && cargo lichking check
+
+  lint-dependencies:
+    name: Lint Dependencies
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        checks:
+          - advisories
+          - bans licenses sources
+
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Lint dependencies
+      uses: EmbarkStudios/cargo-deny-action@v1
+      with:
+        command: check ${{ matrix.checks }}
+
+  lint-dotenv:
+    name: Lint .env
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v1
+
+      - name: Lint .env
+        uses: dotenv-linter/action-dotenv-linter@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: Actions
+          dotenv_linter_flags: --skip UnorderedKey
